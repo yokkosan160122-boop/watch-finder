@@ -194,8 +194,8 @@ h2{font-size:17px;margin:0 0 10px}
 
 <div class="fields2">
 <div class="field">
-<label>DDP送料 ($)</label>
-<input id="ddp" type="number" step=".01">
+<label>DDP送料 (円)</label>
+<input id="ddp" type="number">
 </div>
 
 <div class="field">
@@ -348,9 +348,10 @@ function stock(x){
 
 function calc(x){
   let s=db.settings, fx=+x.fx||s.fx, p=+x.sell||0;
-  let tar=s.ddp?p*s.tariff/100:0, ds=s.ddp?(+x.ddp||0):0;
-  let total=p+tar+ds, fee=total*s.fee/100;
-  let profit=Math.round((total-fee)*fx - tar*fx - ds*fx - (+x.cost||0) - (+x.source||0) - (+x.other||0));
+  let tar=s.ddp?p*s.tariff/100:0, ds=s.ddp?(+x.ddp||0):0; // dsは円のDDP送料として直接加算
+  let total=p+tar, fee=total*s.fee/100; // 外貨ベースの計算に直接円のDDPを引く形に調整
+  // 利益計算: (eBay販売価格*為替 - 手数料等) - 関税(円換算) - DDP送料(円) - 仕入価格 - 仕入送料 - その他費用
+  let profit=Math.round((p-fee)*fx - tar*fx - ds - (+x.cost||0) - (+x.source||0) - (+x.other||0));
   let margin=p?profit/(p*fx)*100:0;
   let days=(+x.lead||0)+(+x.prep||0);
   let safe=days<=s.handling;
@@ -455,7 +456,7 @@ function productCard(x,i){
     </div>
 
     <div class="row">
-      <span>${stock(x.stock)}　🚚 ${m.days}/${db.settings.handling}日</span>
+      <span>${stock(x.stock)} 🚚 ${m.days}/${db.settings.handling}日</span>
       <button class="btn secondary small" onclick="detail(${x.id})">詳細</button>
     </div>
   </div>`;
@@ -510,7 +511,7 @@ function edit(id=null){
 
   let vals={
     brand:x?.brand||'', model:x?.model||'', name:x?.name||'', sell:x?.sell||'', fx:x?.fx||db.settings.fx,
-    cost:x?.cost||'', source:x?.source||0, ddp:x?.ddp||20, other:x?.other||0, sales:x?.sales||0,
+    cost:x?.cost||'', source:x?.source||0, ddp:x?.ddp??3500, other:x?.other||0, sales:x?.sales||0,
     competition:x?.competition||0, supplier:x?.supplier||1, lead:x?.lead??3, prep:x?.prep??2, stock:x?.stock||'in'
   };
 
@@ -578,7 +579,7 @@ function detail(id){
     </div>
   </div>
   <div class="notice ${m.safe?'blue':'bad'}">🚚 仕入 ${x.lead||0}日 ＋ 検品 ${x.prep||0}日 ＝ <b>${m.days}日</b>（期限 ${db.settings.handling}日）</div>
-  <div class="card"><div class="sub">仕入先</div><b>${esc(s?.name||'未設定')}</b><div style="margin-top:7px">${stock(x.stock)}　${s?.days||x.lead||0}日程度</div></div>
+  <div class="card"><div class="sub">仕入先</div><b>${esc(s?.name||'未設定')}</b><div style="margin-top:7px">${stock(x.stock)} ${s?.days||x.lead||0}日程度</div></div>
   <button class="btn primary full" onclick="closeModal();edit(${x.id})">編集</button>
   <button class="btn danger full" onclick="closeModal();del(${x.id})">削除</button>`;
   document.getElementById('modal').classList.add('open');
@@ -599,7 +600,7 @@ function suppliers(){
       <div><div class="model">${esc(s.name)}</div><div class="sub">${esc(s.url||'URL未設定')}</div></div>
       <button class="btn secondary small" onclick="supplierEdit(${s.id})">編集</button>
     </div>
-    <div style="margin-top:9px">${stock(s.stock)}　🚚 ${s.days||0}日　📦 ${db.items.filter(x=>x.supplier===s.id).length}商品</div>
+    <div style="margin-top:9px">${stock(s.stock)} 🚚 ${s.days||0}日 📦 ${db.items.filter(x=>x.supplier===s.id).length}商品</div>
   </div>`).join('')||'<div class="empty">仕入先がありません。</div>';
 }
 
@@ -608,7 +609,7 @@ function supplierEdit(id=null){
   document.getElementById('sheet').innerHTML=`
   <div class="row"><h2>${id?'仕入先を編集':'仕入先を追加'}</h2><button class="close" onclick="closeModal()">×</button></div>
   <div class="field"><label>仕入先名</label><input id="sn" value="${esc(s.name)}"></div>
-  <div class="field"><label>URL</label><input id="su" value="${esc(s.url)}"></div>
+  <div class="id"><label>URL</label><input id="su" value="${esc(s.url)}"></div>
   <div class="field"><label>標準リードタイム(日)</label><input id="sd" type="number" value="${s.days||3}"></div>
   <button class="btn primary full" onclick="saveSupplier(${id||0})">保存</button>`;
   document.getElementById('modal').classList.add('open');
